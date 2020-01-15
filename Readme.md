@@ -102,7 +102,7 @@ The following steps are taken:
 
 ### Using Ultra Disk Storage:
 |     | SQL VM (D2s_v3, Ultra Disks) | |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 |     |  **2x 15000 IOPS / 250MiBps**  | **2x 800 IOPS / 100MiBps** | 
 | INSERT | 00h12m49s | 00h20m28s |
 | UPDATE | 00h13m33s | 00h20m30s |
@@ -112,7 +112,7 @@ The following steps are taken:
 
 ### Using Local SSD
 |     | SQL VM (L4s with 678 GiB Local SSD) ||
-| --- | --- | --- | --- |
+| --- | --- | --- |
 |     |  **Log + Data on Local SSD** | **Log on Local SSD, P10 for data** | 
 | INSERT | 00h04m29s | 00h06m28s |
 | UPDATE | 00h04m48s | 00h06m30s |
