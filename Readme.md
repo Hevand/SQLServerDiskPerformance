@@ -129,6 +129,7 @@ A new SQL Server VM is provisioned for every test, using the steps defined here 
 As shown in the test results, disk latency can have a big impact on the performance of your SQL Servers workload. There are multiple options available and for production systems, a combination of these options can give best results. 
 
 For example: 
+
 | Drive | Stores                       | Characteristics                              |
 | ----- | ---------------------------- | -------------------------------------------- |
 | C     | OS + SQL Server installation | Premium Disk with Read/Write caching enabled |
