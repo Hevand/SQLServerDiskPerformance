@@ -52,30 +52,23 @@ Both [Virtual Machines](https://docs.microsoft.com/en-us/azure/virtual-machines/
 
 For IOPS and Throughput, the combination of these limits results in the actual IOPS and Throughput available to a SQL Server machine. Actual utilization can be monitored from within the Azure Portal, and you can scale up the VM and available disks (either by scaling or striping) until your application's resource utilization stays under the maximum available capacity. 
 
-### What if IOPS and Throughput are under control, but the application is still slower than it was on premise?
-This happens when your application is spending its time sequentially 'waiting' for every request/response to complete instead of having multiple processes running in parallel. An example can be a script based on SQL cursors or a very chatty application.
+### What if IOPS and Throughput are under control, but the application is still slower than it was on premises?
+This happens when your application is spending its time sequentially 'waiting' for every request/response to complete instead of having multiple processes running in parallel. An example can be a script based on [Cursors (Transact-SQL)](https://docs.microsoft.com/en-us/sql/t-sql/language-elements/cursors-transact-sql?view=sql-server-ver15).
 
-In that scenario, every 'delay' between compute and storage is impacting the total execution time of the script. 
+Here, every call between compute and storage introduces a small delay (latency) that is impacting the total execution time of the script. This delay adds up quickly: 1 million operations x 1 millisecond latency = 16 minutes and 40 seconds of execution time, excluding any other processing that may be required. 
 
-This adds up quickly. As an example: performing 1 million operations with a 1 millisecond latency takes 16 minutes and 40 seconds - in latency alone. 
-
-Fortunately, Azure and SQL Server support different types of disks with different latency characteristics: 
+Fortunately, Azure and SQL Server support different types of storage with different latency characteristics: 
 - Using Blob storage directly (Latency based on network)
 - Using Premium SSD (Latency of 5-10ms)
 - Using Ultra Disks (latency under 1ms)
 - Using the Local SSD (fastest; latency close to 0ms)
 
-Next to this, Premium Disks allow for different caching strategies - None, ReadOnly, ReadWrite - that can influence the performance. For the other storage options, these strategies are not available. 
+Premium Disks also supports different caching strategies that leverage local memory and local SSD. These strategies are [None, ReadOnly, ReadWrite](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/premium-storage-performance#disk-caching)and will influence your test results. These strategies are not available for the other storage options.
 
 ## Test approach
 To illustrate the impact of latency on a sequential / SQL cursor-based script, the [PerformanceTest.sql](Scripts/PerformanceTest.sql) script is used. Note that this script is specific to validating the impact of latency. 
 
-The following steps are taken: 
-- On the Azure portal, create a fresh SQL Server 2019 on Windows Server 2019 machine, based on the Azure Marketplace image. Opt for the (free) SQL Server Development license.
-- Configure storage as required
-- After provisioning the machine, use SQL Management Studio to:
-  - Create a new database, named 'test'
-  - Execute the performance test script
+A new SQL Server VM is provisioned for every test, using the steps defined here (https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sql/virtual-machines-windows-sql-server-storage-configuration).
 
 ## Results
 > **These results give an anecdotal and informal indication of current execution times. These test results should not be considered out of this context**  
@@ -118,7 +111,9 @@ The following steps are taken:
 | UPDATE | 00h04m48s | 00h06m30s |
 | DELETE | 00h04m21s | 00h06m29s |
 
-> Consideration: for this setup, a 4-core, storage-optimized VM was selected. This VM is from a previous generation and availability might be limited towards the future.  
+> CAUTION: Using the temporary disk on a single-instance setup is a guaranteed way to suffer from data loss, system unavailability and other disaster scenarios when used in your production environment. This setup is not suggested for any production workload and only included for reasons of completeness. 
+
+> For this setup, a 4-core, storage-optimized VM was selected. This VM is from a previous generation and availability might be limited towards the future.  
 
 ### Using SQL Managed Instance:
 |     | SQL Managed Instance | | |
@@ -128,13 +123,22 @@ The following steps are taken:
 | UPDATE | 01h16m52s | 00h29m09s | 00h24m33s |
 | DELETE | 01h16m55s | 00h28m23s | 00h23m49s |
 
-> Important observation here is that, although SQL Server Managed Instance Business Critical uses the local SSD to persist data, it need to synchronously commit every single transaction on two nodes within the cluster to provide the required uptime. This requirement introduces additional overhead in network communication, which impacts the execution time. 
+> Although SQL Server Managed Instance Business Critical uses the local SSD to persist data, the timings differ dramatically from the tests that used a SQL VM and stored data on the local SSD. This is caused by network latency: SQL Server need to synchronously commit every single transaction on the primary and a secondary node within the cluster to guarantee data consistency. This requirement introduces additional overhead in network communication, which impacts the execution time. 
 
 ## Considerations
-As can be observed from the test results, disk latency can have a big impact on SQL Servers performance. Azure offers a number of options here, where Ultra Disk and Local SSD are most promising. 
+As shown in the test results, disk latency can have a big impact on the performance of your SQL Servers workload. There are multiple options available and for production systems, a combination of these options can give best results. 
 
-The following considerations apply: 
-- **Availability** - Local SSDs are fast and cheap - but they do not persist data in case of a reboot, deallocation, resized or rehosted VM. This could impact your service availability. 
-- **Costs** - Ultra Disks have the benefit of being persistent and offering 99.999% avaialbility, but are more expensive than the other storage options. To balance performance and costs, detailed analysis of the application behavior is required such that a differentiation in data (and file groups) or log strategies can be considered.  
-- **Backup** - Azure Backup offers centralized backup management, but does not support Ultra Disks at this moment. Backups can be made via SQL Server's Automated Backup functionality, which is configured via SQL Server or the SQL Server resource provider in the Azure portal.
+For example: 
+| Drive | Stores | Characteristics |
+| ----  | ------ | --------------- |
+| C:\   | OS + SQL Server installation | Premium Disk with Read/Write caching enabled |
+| D:\   | TempDB | Local SSD, temporary storage. |
+| F:\   | Data Files (\*.mdf) | Premium Disk with ReadOnly caching. This disk can be dimensioned based on storage need, IOPS and Throughput benefit from ReadOnly caching. |
+| G:\   | Log Files (\*.ldf) | Ultra Disks for low-latency writes. This disk can be dimensioned based on expected [transaction log size](https://docs.microsoft.com/en-us/sql/relational-databases/logs/manage-the-size-of-the-transaction-log-file?view=sql-server-ver15) and monitored maximum IOPS and Throughput. |
+
+
+## Recommendations
+- **Availability** - Local SSDs are fast and cheap - but they do not persist data in case of a reboot, deallocation, resized or rehosted VM. Don't use this for applications that are likely to end up in production, as it will hide actual performance issues. 
+- **Costs** - Ultra Disks have the benefit of being persistent and offering 99.999% avaialbility, but are more expensive than the other storage options. Monitor application behavior and resource consumption, such that performance and costs can be balanced.   
+- **Backup** - Disk backups are not recommended for SQL Server workloads. Azure Backup offers centralized backup management, but does not support Ultra Disks at this moment. Backups can be made via SQL Server's Automated Backup functionality, which is configured via SQL Server or the SQL Server resource provider in the Azure portal. 
 - **Business Continuity / Disaster Recovery** - Azure Site Recovery does not support Ultra Disks for Azure-to-Azure failover, and defining it as a physical server in ASR results in inaccessible volumes after failover. A successful Disaster Recovery Strategy and the corresponding Recovery Point Objective (RPO) and Recovery Time Objective (RTO) should be based on the restoration of a backup. 
