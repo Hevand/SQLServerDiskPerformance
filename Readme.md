@@ -131,11 +131,10 @@ As shown in the test results, disk latency can have a big impact on the performa
 For example: 
 | Drive | Stores | Characteristics |
 | ----  | ------ | --------------- |
-| C:\   | OS + SQL Server installation | Premium Disk with Read/Write caching enabled |
-| D:\   | TempDB | Local SSD, temporary storage. |
-| F:\   | Data Files (\*.mdf) | Premium Disk with ReadOnly caching. This disk can be dimensioned based on storage need, IOPS and Throughput benefit from ReadOnly caching. |
-| G:\   | Log Files (\*.ldf) | Ultra Disks for low-latency writes. This disk can be dimensioned based on expected [transaction log size](https://docs.microsoft.com/en-us/sql/relational-databases/logs/manage-the-size-of-the-transaction-log-file?view=sql-server-ver15) and monitored maximum IOPS and Throughput. |
-
+| C:\\   | OS + SQL Server installation | Premium Disk with Read/Write caching enabled |
+| D:\\   | TempDB | Local SSD, temporary storage. |
+| F:\\   | Data Files (.mdf) | Premium Disk with ReadOnly caching.|
+| G:\\   | Log Files (.ldf) | Ultra Disks for low-latency writes. |
 
 ## Recommendations
 - **Availability** - Local SSDs are fast and cheap - but they do not persist data in case of a reboot, deallocation, resized or rehosted VM. Don't use this for applications that are likely to end up in production, as it will hide actual performance issues. 
