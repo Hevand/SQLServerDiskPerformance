@@ -86,12 +86,30 @@ A new SQL Server VM is provisioned for every test, using the steps defined here 
 ### Using Premium Storage:
 |     | SQL VM (D2s_v3, Premium Disks) | | |
 | --- | --- | --- | --- |
-|     |  **1 P30 disk, ReadOnly cache**  | **1 P30 disk, ReadWrite cache** | **2x P30 disk /w Write Accelerator** |
+|     |  **1 P30 disk, ReadOnly cache**  | **1 P30 disk, ReadWrite cache** | **2x P30 disk, see below** |
 | INSERT | 01h03m38s | 00h46m35s | 00h40m02s |
 | UPDATE | 01h02m12s | 00h50m33s | 00h44m51s |
 | DELETE | 01h01m36s | 00h51m39s | 00h44m08s |
 
-> Considerations: The second measurements are against Microsoft recommendations. Guidance is to use ReadOnly caching for SQL Server workloads. 
+> The second measurements are against Microsoft recommendations. Guidance is to use ReadOnly caching for SQL Server workloads. 
+
+In the third setup, I used the following disk configuration: 
+- 1 P30 (Premium Managed disk, 1TB) for the Data file, ReadOnly caching
+- 1 P30 (Premium Managed disk, 1TB) for the Log file, None caching 
+- TempDB on the temporary drive.
+
+### Using M-series VM, with Premium Storage with Write Acceleration
+|     | SQL VM (M8ms, Premium Disks) |
+| --- | --- |
+|     |  **2 P30 disk**  |
+| INSERT | 00h13m06s | 
+| UPDATE | 00h13m06s | 
+| DELETE | 00h13m07s | 
+
+In this setup, I used the following disk configuration: 
+- 1 P30 (Premium Managed disk, 1TB) for the Data file, ReadOnly caching
+- 1 P30 (Premium Managed disk, 1TB) for the Log file, No caching + Write Acceleration enabled
+- TempDB on the temporary drive.
 
 ### Using Ultra Disk Storage:
 |     | SQL VM (D2s_v3, Ultra Disks) | |
@@ -103,6 +121,11 @@ A new SQL Server VM is provisioned for every test, using the steps defined here 
 
 > Observation: Disk configurations have been oversized for the test, to ensure the limits would be driven by the application - not the infrastructure. Based on the monitoring, IOPS peaked at 1300 and Throughput at 50MBps. 
 
+In this setup, I used the following disk configuration: 
+- 1 100GB Ultra Disk for the Data file, ReadOnly caching
+- 1 100GB Ultra Disk for the Log file, None caching
+- TempDB on the temporary drive.
+
 ### Using Local SSD
 |     | SQL VM (L4s with 678 GiB Local SSD) ||
 | --- | --- | --- |
@@ -113,7 +136,7 @@ A new SQL Server VM is provisioned for every test, using the steps defined here 
 
 > CAUTION: Using the temporary disk on a single-instance setup is a guaranteed way to suffer from data loss, system unavailability and other disaster scenarios when used in your production environment. This setup is not suggested for any production workload and only included for reasons of completeness. 
 
-> For this setup, a 4-core, storage-optimized VM was selected. This VM is from a previous generation and availability might be limited towards the future.  
+> For this setup, a 4-core, storage-optimized VM was selected. This VM offers a large temporary disk, but is from an older hardware generation and availability might be limited towards the future.  
 
 ### Using SQL Managed Instance:
 |     | SQL Managed Instance | | |
@@ -139,6 +162,6 @@ For example:
 
 ## Recommendations
 - **Availability** - Local SSDs are fast and cheap - but they do not persist data in case of a reboot, deallocation, resized or rehosted VM. Don't use this for applications that are likely to end up in production, as it will hide actual performance issues. 
-- **Costs** - Ultra Disks have the benefit of being persistent and offering 99.999% avaialbility, but are more expensive than the other storage options. Monitor application behavior and resource consumption, such that performance and costs can be balanced.   
-- **Backup** - Disk backups are not recommended for SQL Server workloads, but other options exist. Azure Backup offers centralized backup management but does not support Ultra Disks (today). For SQL Servers using Ultra Disks, backups can be made via SQL Server's Automated Backup functionality. This can be configured via SQL Server directly or via the SQL Server resource provider in the Azure portal. For more information around SQL Server backup, see [the documentation](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sql/virtual-machines-windows-sql-backup-recovery)
+- **Costs** - Ultra Disks have the benefit of being persistent and offering 99.999% avaialbility, but are more expensive than the other storage options. Monitor application behavior and resource consumption, such that performance and costs can be balanced. M-series VMs with write accceleration offer similar performance, but have a certain minimum number of cores which results in higher compute and SQL licensing costs.     
+- **Backup** - SQL Server offers application-specific backup, whereas disk-level backups are not recommended for SQL Server workloads. Azure Backup offers centralized backup management but does not support Ultra Disks (today). For SQL Servers using Ultra Disks, backups can be made via SQL Server's Automated Backup functionality. This can be configured via SQL Server directly or via the SQL Server resource provider in the Azure portal. For more information around SQL Server backup, see [the documentation](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sql/virtual-machines-windows-sql-backup-recovery)
 - **Business Continuity / Disaster Recovery** - Ultra disks do not support snapshots, and Azure Site Recovery does not support Ultra Disks for Azure-to-Azure failover. Although it is _possible_ to define your VM as a physical server in ASR, it does not provide a solution here, as it results in inaccessible volumes after a failover. For production workloads, make sure that the Disaster Recovery Strategy is based on the restoration of a backup. 
