@@ -96,7 +96,7 @@ SET @startTime = GETDATE();
 
 while (@loop <= @updates)
 begin
-	update unit4_test set intcol2 = @loop, nvarcol2 = 'abcdefghijkl', nvarcol3 = 'mnopqrstuvwx' where
+	update performance_test set intcol2 = @loop, nvarcol2 = 'abcdefghijkl', nvarcol3 = 'mnopqrstuvwx' where
 		nvarcol1 = 'a' and 
 		nvarcol2 = 'b' and
 		intcol1 = @loop and
@@ -114,7 +114,7 @@ SET @startTime = GETDATE();
 
 while (@loop <= @actual_deletes)
 begin
-	delete unit4_test where
+	delete performance_test where
 		nvarcol1 = 'a' and 
 		nvarcol2 = 'abcdefghijkl' and
 		nvarcol3 = 'mnopqrstuvwx' and
