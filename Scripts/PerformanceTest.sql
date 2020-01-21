@@ -64,7 +64,6 @@ declare @actual_deletes int = 1000000
 if @actual_deletes > @inserts
 	BEGIN
 		Select 'Cannot delete more rows than inserted' as 'Error'
-		goto TheEndOfTheTest
 	END
 
 -- CAPTURE SCRIPT START TIME
@@ -75,7 +74,7 @@ SET @startTime = GETDATE();
 
 while (@loop <= @inserts)
 begin
-	insert into unit4_test values
+	insert into performance_test values
 	(
 		'a',
 		'b',
